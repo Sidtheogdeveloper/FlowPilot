@@ -1,0 +1,20 @@
+services:
+  api:
+    environment:
+      TABLE_INFERENCE_URL: http://table_ollama:11434/v1/chat/completions
+      TABLE_MODEL: flowpilot-tables
+      TABLE_JSON_MODE: "1"
+      TABLE_MODEL_REVISION: 4edb920b6f14e3b9284d4502a6485103d72cde05
+      TABLE_MODEL_SHA256: 8cdb57cbb880d313736a9bc4e3d3d2485f145b5e19cf33783746e753e82641fc
+  table_ollama:
+    image: ollama/ollama@sha256:926d40fd6eeeebd346b5c358a63de2a10ec995371cd93dd22f1843200694b1a6
+    environment:
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_KEEP_ALIVE: 30m
+    ports: ["127.0.0.1:8003:11434"]
+    volumes:
+      - ./.models:/models:ro
+      - table_ollama_models:/root/.ollama
+volumes:
+  table_ollama_models:

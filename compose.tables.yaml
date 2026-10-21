@@ -1,0 +1,19 @@
+services:
+  api:
+    environment:
+      TABLE_INFERENCE_URL: http://host.docker.internal:8002/v1/chat/completions
+    build:
+      context: .
+      dockerfile: Dockerfile
+  worker_a:
+    build:
+      context: .
+      dockerfile: Dockerfile
+  worker_b:
+    build:
+      context: .
+      dockerfile: Dockerfile
+  tests:
+    build:
+      context: .
+      dockerfile: Dockerfile

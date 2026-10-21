@@ -1,0 +1,7 @@
+import type {CSSProperties,ReactNode} from 'react';
+type Name='plus'|'search'|'chat'|'file'|'menu'|'close'|'sliders'|'arrow'|'download'|'chevron'|'workflow'|'check'|'pause'|'play';
+export function Icon({name,size=18,className='',style}:{name:Name;size?:number;className?:string;style?:CSSProperties}){
+ const paths:Record<Name,ReactNode>={plus:<path d="M12 5v14M5 12h14"/>,search:<><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></>,chat:<path d="M20 15a3 3 0 0 1-3 3H8l-5 3V6a3 3 0 0 1 3-3h11a3 3 0 0 1 3 3z"/>,file:<><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></>,menu:<path d="M4 6h16M4 12h16M4 18h16"/>,close:<path d="m6 6 12 12M6 18 18 6"/>,sliders:<><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="18" r="2"/></>,arrow:<path d="M12 19V5m-6 6 6-6 6 6"/>,download:<><path d="M12 3v12m-5-5 5 5 5-5M4 16v4h16v-4"/></>,chevron:<path d="m9 5 7 7-7 7"/>,workflow:<><rect x="9" y="2" width="6" height="5" rx="1"/><rect x="2" y="17" width="6" height="5" rx="1"/><rect x="16" y="17" width="6" height="5" rx="1"/><path d="M12 7v5H5v5m7-5h7v5"/></>,check:<path d="m5 12 4 4L19 6"/>,pause:<><path d="M8 5v14M16 5v14"/></>,play:<path d="m8 4 12 8-12 8z"/>};
+ return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={className} style={style}>{paths[name]}</svg>;
+}
+

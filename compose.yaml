@@ -1,0 +1,93 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports: ["127.0.0.1:8080:80"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ && wget -q -O /dev/null http://127.0.0.1/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    depends_on:
+      api: {condition: service_healthy}
+  database:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: workflow
+      POSTGRES_USER: workflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U workflow"]
+      interval: 2s
+      retries: 30
+  api:
+    build: .
+    ports: ["127.0.0.1:8000:8000"]
+    environment: &env
+      DATABASE_URL: postgresql+psycopg://workflow:${POSTGRES_PASSWORD}@database/workflow
+      ARTIFACT_ROOT: /artifacts
+      HF_INFERENCE_URL: ${HF_INFERENCE_URL:-http://host.docker.internal:8001/v1/chat/completions}
+      HF_MODEL: Qwen/Qwen2.5-0.5B-Instruct
+      TABLE_INFERENCE_URL: ${TABLE_INFERENCE_URL:-http://table_llm:8002/v1/chat/completions}
+    volumes: ["artifacts:/artifacts"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 2s
+      retries: 30
+    depends_on:
+      database: {condition: service_healthy}
+  worker_a:
+    build: .
+    command: python -m app.worker
+    environment:
+      <<: *env
+      WORKER_ID: worker-a
+      WORKER_CPU: 2
+      WORKER_MEMORY_MB: 512
+    cpus: 2
+    mem_limit: 768m
+    volumes: ["artifacts:/artifacts"]
+    depends_on:
+      api: {condition: service_healthy}
+  worker_b:
+    build: .
+    command: python -m app.worker
+    environment:
+      <<: *env
+      WORKER_ID: worker-b
+      WORKER_CPU: 1
+      WORKER_MEMORY_MB: 256
+    cpus: 1
+    mem_limit: 512m
+    volumes: ["artifacts:/artifacts"]
+    depends_on:
+      api: {condition: service_healthy}
+  llm:
+    profiles: ["llm"]
+    build:
+      context: .
+      dockerfile: Dockerfile.llm
+    ports: ["127.0.0.1:8001:8001"]
+    volumes: ["model_cache:/models", "./training/artifacts:/adapters:ro"]
+    environment:
+      LLM_HOST: 0.0.0.0
+      HF_MODEL: Qwen/Qwen2.5-0.5B-Instruct
+      HF_ADAPTER_PATH: ${HF_ADAPTER_PATH:-/adapters/intent-lora}
+  table_llm:
+    profiles: ["table-llm"]
+    build:
+      context: .
+      dockerfile: Dockerfile.llm
+    volumes: ["model_cache:/models", "./training/artifacts:/adapters:ro"]
+    environment:
+      LLM_HOST: 0.0.0.0
+      LLM_PORT: 8002
+      HF_MODEL: Qwen/Qwen2.5-0.5B-Instruct
+      HF_ADAPTER_PATH: ${TABLE_ADAPTER_PATH:-/adapters/table-lora}
+volumes:
+  model_cache:
+  postgres_data:
+  artifacts:
+

@@ -1,0 +1,19 @@
+services:
+  frontend:
+    ports: !override ["127.0.0.1:18080:80"]
+  api:
+    ports: !override ["127.0.0.1:18000:8000"]
+  llm:
+    ports: !override ["127.0.0.1:18001:8001"]
+  tests:
+    profiles: ["verify"]
+    build: .
+    environment:
+      DATABASE_URL: postgresql+psycopg://workflow:${POSTGRES_PASSWORD}@database/workflow_test
+      ARTIFACT_ROOT: /test-artifacts
+    volumes:
+      - ./tests:/tests:ro
+      - ./evidence:/evidence
+    command: python -m pytest -q /tests -o cache_dir=/tmp/pytest-cache --junitxml=/evidence/docker-backend-tests.xml
+    depends_on:
+      database: {condition: service_healthy}

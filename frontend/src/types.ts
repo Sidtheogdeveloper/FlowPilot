@@ -1,0 +1,10 @@
+export type PlannerMode = 'template' | 'huggingface';
+export type Policy = 'greedy' | 'heft' | 'bounded';
+export type Dataset = {id:string;filename:string;rows:number;columns?:string[];artifact?:string;workflow_count?:number;last_used?:string|null};
+export type PlanNode = {id:string;handler:string;depends_on:string[];resources?:{cpu:number;memory_mb:number};parameters?:Record<string,unknown>};
+export type Task = {id:string;handler:string;status:string;artifact?:string|{id:string}|null;artifact_id?:string;attempts?:unknown[]};
+export type Insights={headline:string;summary:string;findings:{title:string;text:string}[];limitations:string[]};
+export type Chat = {kind?:string;id:string;search_text?:string;chat_id?:string;revision?:number;status:string;policy:Policy;created?:string;dataset_id?:string;dataset_filename?:string;request?:string|null;title?:string;planner_mode?:PlannerMode};
+export type Workflow = Chat & {plan:{tasks:PlanNode[]};dataset?:Dataset;tasks:Task[];events?:{kind:string;created?:string;data?:Record<string,unknown>}[];metrics?:Record<string,unknown>;planner?:Record<string,unknown>;validation?:unknown;parent_workflow_id?:string|null;effective_request?:string;insights?:Insights|null;report_url?:string|null;turns?:Workflow[];latest_workflow_id?:string};
+export type Worker = {id:string;heartbeat?:string;cpu?:number;memory_mb?:number;[key:string]:unknown};
+export type Draft = {datasetId:string;request:string;planner:PlannerMode;policy:Policy};
