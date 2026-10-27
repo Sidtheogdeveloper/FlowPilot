@@ -23,6 +23,8 @@ def summary_rows(c,flow):
 def main():
     evidence={}
     with httpx.Client(base_url='http://127.0.0.1:18080/api',timeout=240) as c:
+        from auth_client import sign_in
+        sign_in(c)
         def upload(name):
             response=c.post('/datasets',files={'file':(name,(ROOT/'samples/general_tables'/name).read_bytes())});response.raise_for_status();return response.json()['id']
         education=upload('education.csv')

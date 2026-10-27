@@ -1,7 +1,14 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {api, artifactUrl, errorMessage, progress} from './api';
-afterEach(()=>vi.unstubAllGlobals());
+import {api, artifactUrl, errorMessage, progress,setCsrfToken} from './api';
+afterEach(()=>{setCsrfToken('');vi.unstubAllGlobals();});
 describe('user-facing workflow state',()=>{
+  it('sends CSRF only on mutations and keeps session cookies same-origin',async()=>{
+    const mocked=vi.fn().mockResolvedValue(new Response('{}',{status:200}));vi.stubGlobal('fetch',mocked);setCsrfToken('synthetic-csrf');
+    await api('/datasets');await api('/auth/logout',{method:'POST'});
+    expect(mocked.mock.calls[0][1].headers.has('X-FlowPilot-CSRF')).toBe(false);
+    expect(mocked.mock.calls[1][1].headers.get('X-FlowPilot-CSRF')).toBe('synthetic-csrf');
+    expect(mocked.mock.calls[1][1].credentials).toBe('same-origin');
+  });
   it('counts accepted/completed work, without counting running work',()=>expect(progress([{status:'completed'},{status:'running'},{status:'accepted'}])).toBe(67));
   it('handles empty workflow',()=>expect(progress([])).toBe(0));
   it('preserves validator locations',()=>expect(errorMessage({detail:[{loc:['body','request'],msg:'Required'}]})).toBe('body.request: Required'));

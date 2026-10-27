@@ -10,12 +10,15 @@ def main():
     out=Path('evidence');out.mkdir(exist_ok=True)
     if not os.environ.get('DATABASE_URL','').endswith('/workflow_test'):raise ValueError('Dedicated workflow_test database required')
     db.init_db()
-    with db.Session.begin() as s:s.execute(text('TRUNCATE events,attempts,tasks,workflows,datasets,workers RESTART IDENTITY CASCADE'))
+    with db.Session.begin() as s:s.execute(text('TRUNCATE pending_plans,events,attempts,tasks,workflows,datasets,workers,artifact_grants,user_sessions,account_tokens,auth_throttles,users RESTART IDENTITY CASCADE'))
     env=os.environ.copy();env['WORKER_ID']='process-killed';env['WORKER_CPU']='1';env['WORKER_MEMORY_MB']='512'
     worker=subprocess.Popen([sys.executable,'-m','app.worker'],env=env,stdout=subprocess.DEVNULL,stderr=(out/'worker-killed.log').open('w'))
     replacement=None
     try:
         with TestClient(app) as c:
+            registered=c.post('/auth/register',json={'name':'Benchmark Test','email':'benchmark@example.invalid','password':'Synthetic benchmark passphrase 2026!'})
+            registered.raise_for_status()
+            c.headers['X-FlowPilot-CSRF']=registered.json()['csrf_token']
             deadline=time.monotonic()+20
             while time.monotonic()<deadline:
                 if any(w['id']=='process-killed' for w in c.get('/workers').json()):break
@@ -46,4 +49,3 @@ def main():
         for p in (worker,replacement):
             if p and p.poll() is None:p.terminate();p.wait(10)
 if __name__=='__main__':main()
-

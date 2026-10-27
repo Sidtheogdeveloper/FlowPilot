@@ -5,7 +5,7 @@ from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError,InvalidHashError
 from fastapi import APIRouter,HTTPException,Request,Response
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel,Field
 from sqlalchemy import select,update
 from sqlalchemy.dialects.postgresql import insert
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -67,12 +67,12 @@ def new_session(s,user,request,response):
     return {'user':profile(user),'csrf_token':csrf(raw),'session_id':row.id}
 
 class Credentials(BaseModel):
-    email:str
-    password:str
-class Registration(Credentials):name:str
+    email:str=Field(max_length=254)
+    password:str=Field(max_length=128)
+class Registration(Credentials):name:str=Field(max_length=80)
 
 @router.get('/config')
-def config():return {'brand':'FlowPilot','registration_open':registration_open(),'password_min_length':15,'password_max_length':128,'password_reset_available':bool(os.getenv('SMTP_HOST'))}
+def config():return {'brand':'FlowPilot','registration_open':registration_open(),'password_min_length':15,'password_max_length':128,'password_reset_available':bool(os.getenv('SMTP_HOST')),'verification_required':secure_cookie()}
 @router.post('/register',status_code=201)
 def register(payload:Registration,request:Request,response:Response):
     if not registration_open():raise HTTPException(403,'New account registration is currently closed')
@@ -149,6 +149,8 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         path=request.url.path.rstrip('/') or '/'
         public=path in ('/health','/auth/config','/auth/register','/auth/login','/auth/forgot-password','/auth/reset-password','/auth/verify-email')
         if not principal and not public:return JSONResponse({'detail':'Please sign in to continue'},status_code=401)
+        if principal and secure_cookie() and not principal.email_verified and not path.startswith('/auth/') and path!='/health':
+            return JSONResponse({'detail':'Verify your email in Account settings before using your workspace'},status_code=403)
         if principal and unsafe and path not in ('/auth/login','/auth/register','/auth/forgot-password','/auth/reset-password','/auth/verify-email'):
             if not hmac.compare_digest(request.headers.get('x-flowpilot-csrf',''),csrf(raw)):
                 return JSONResponse({'detail':'Your session could not validate this request. Refresh and try again.'},status_code=403)

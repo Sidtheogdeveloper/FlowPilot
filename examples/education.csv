@@ -1,0 +1,7 @@
+class,subject,score,recorded_at
+A,Math,80,2026-09-01
+A,Math,90,2026-09-02
+B,Math,70,2026-09-01
+B,Math,85,2026-09-02
+A,Science,88,2026-09-03
+B,Science,76,2026-09-03

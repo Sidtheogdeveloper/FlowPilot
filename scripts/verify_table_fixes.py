@@ -11,6 +11,8 @@ ROOT=Path(__file__).resolve().parents[1]
 def main():
     evidence={}
     with httpx.Client(base_url='http://127.0.0.1:18080/api',trust_env=False,timeout=240) as c:
+        from auth_client import sign_in
+        sign_in(c)
         def upload(name,data):
             r=c.post('/datasets',files={'file':(name,data)});r.raise_for_status();return r.json()['id']
         def plan(identity,question):

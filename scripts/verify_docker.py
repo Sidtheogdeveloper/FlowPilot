@@ -9,6 +9,8 @@ import httpx
 ROOT = Path(__file__).resolve().parents[1]
 COMPOSE = ['docker', 'compose', '--env-file', '.runtime/docker.verify.env', '-p', 'workflow-phase2-verify', '-f', 'compose.yaml', '-f', 'compose.verify.yaml']
 client = httpx.Client(base_url='http://127.0.0.1:18000', trust_env=False, timeout=180)
+from auth_client import sign_in
+sign_in(client)
 request = 'Clean the transactions, calculate monthly sales and product performance, flag unusually large transactions using IQR multiplier 2, and generate a report.'
 evidence = {'project': 'workflow-phase2-verify', 'api_port': 18000, 'model_port': 18001, 'runs': []}
 

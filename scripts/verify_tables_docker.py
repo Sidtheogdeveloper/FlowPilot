@@ -7,7 +7,7 @@ import httpx
 
 ROOT=Path(__file__).resolve().parents[1]
 COMMAND=['docker','compose','--env-file','.runtime/docker.verify.env','-p','workflow-phase2-verify','-f','compose.yaml','-f','compose.verify.yaml','-f','compose.tables.yaml']
-def compose(*args):subprocess.run(COMMAND+list(args),cwd=ROOT,check=True,stdout=subprocess.DEVNULL)
+def compose(*args):return subprocess.run(COMMAND+list(args),cwd=ROOT,check=True,capture_output=True,text=True).stdout
 def wait(c,identity,seconds=90):
     deadline=time.monotonic()+seconds
     while time.monotonic()<deadline:
@@ -19,6 +19,8 @@ def wait(c,identity,seconds=90):
 def main():
     evidence={}
     with httpx.Client(base_url='http://127.0.0.1:18080/api',timeout=180) as c:
+        from auth_client import sign_in
+        sign_in(c)
         raw=b'device,reading,site\n'+b''.join(f'd{i%30},{i%100},s{i%4}\n'.encode() for i in range(60000))
         upload=c.post('/datasets',files={'file':('sensor_unseen.csv',raw)});upload.raise_for_status();dataset=upload.json()
         preview=c.post('/plans',json={'dataset_id':dataset['id'],'generic':True,'request':'overview'});preview.raise_for_status();identity=preview.json()['id']
@@ -39,7 +41,14 @@ def main():
         finally:compose('start','worker_a','worker_b','worker_c')
         references=[t['artifact'] for t in detail['tasks']]
         for reference in references:c.get('/artifacts/'+reference).raise_for_status()
-        compose('restart','database','api','worker_a','worker_b','worker_c')
+        compose('restart','database')
+        deadline=time.monotonic()+60
+        while time.monotonic()<deadline:
+            try:
+                if 'accepting connections' in compose('exec','-T','database','pg_isready','-U','workflow'):break
+            except subprocess.CalledProcessError:pass
+            time.sleep(.5)
+        compose('restart','api','worker_a','worker_b','worker_c')
         deadline=time.monotonic()+60
         while time.monotonic()<deadline:
             try:

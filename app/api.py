@@ -13,6 +13,8 @@ from .validator import validate_plan
 from .coordinator import loop,command
 @asynccontextmanager
 async def lifespan(app):
+    from .account_features import validate_deployment
+    validate_deployment()
     db.init_db();stop=threading.Event();thread=threading.Thread(target=loop,args=(stop,),daemon=True);thread.start()
     yield
     stop.set();thread.join(5)
@@ -21,6 +23,8 @@ app.add_middleware(CORSMiddleware,allow_origins=['http://localhost:5173','http:/
 from .auth import AuthenticationMiddleware,router as account_router
 app.add_middleware(AuthenticationMiddleware)
 app.include_router(account_router)
+from .account_features import router as account_features_router
+app.include_router(account_features_router)
 @app.get('/health')
 def health():return {'status':'ok'}
 @app.get('/catalogue')

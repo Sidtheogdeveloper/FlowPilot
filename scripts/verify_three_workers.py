@@ -10,6 +10,8 @@ def main():
     expected={'worker-a','worker-b','worker-c'}
     evidence={'checked_at':datetime.now(timezone.utc).isoformat(),'scope':'Live same-host three-worker smoke test; not a speedup benchmark','workflows':[]}
     with httpx.Client(base_url='http://127.0.0.1:18080/api',timeout=120) as c:
+        from auth_client import sign_in
+        sign_in(c)
         c.get('/health').raise_for_status()
         workers=c.get('/workers');workers.raise_for_status();roster=workers.json()
         live=[w for w in roster if w['id'] in expected and (datetime.now(timezone.utc)-datetime.fromisoformat(w['heartbeat'])).total_seconds()<20]

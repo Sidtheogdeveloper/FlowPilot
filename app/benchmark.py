@@ -10,10 +10,13 @@ def main(repeats=3,rows=10000,concurrent=1):
     if not os.environ.get('DATABASE_URL','').endswith('/workflow_test'):raise ValueError('Benchmark reset requires dedicated workflow_test database')
     os.environ['ESTIMATE_HISTORY']='0'
     db.init_db()
-    with db.Session.begin() as s:s.execute(text('TRUNCATE events,attempts,tasks,workflows,datasets,workers RESTART IDENTITY CASCADE'))
+    with db.Session.begin() as s:s.execute(text('TRUNCATE pending_plans,events,attempts,tasks,workflows,datasets,workers,artifact_grants,user_sessions,account_tokens,auth_throttles,users RESTART IDENTITY CASCADE'))
     out=Path('evidence')/('single' if concurrent==1 else f'concurrent_{concurrent}');out.mkdir(parents=True,exist_ok=True);results=[]
     (out/'environment.json').write_text(json.dumps({'python':platform.python_version(),'platform':platform.platform(),'workers':'2 threads on same host; capacities2CPU/512MB and1CPU/256MB; configured speedpriors1/.8','history_enabled':False,'warmup_excluded':True,'policy_order':'rotated per seed','concurrent':concurrent},indent=2))
     with TestClient(app) as c:
+        registered=c.post('/auth/register',json={'name':'Benchmark Test','email':'benchmark@example.invalid','password':'Synthetic benchmark passphrase 2026!'})
+        registered.raise_for_status()
+        c.headers['X-FlowPilot-CSRF']=registered.json()['csrf_token']
         stop=threading.Event();threads=[threading.Thread(target=run,args=(stop,'benchmark-'+str(i),2 if i==0 else 1,512 if i==0 else 256,1 if i==0 else .8),daemon=True) for i in range(2)]
         for t in threads:t.start()
         try:

@@ -8,6 +8,17 @@ from test_runtime import client
 
 PASSWORD='A synthetic testing passphrase 123!'
 
+def test_restart_migration_avoids_unnecessary_table_locks(client):
+    from sqlalchemy import event
+    from sqlalchemy.engine import Engine
+    ddl=[]
+    def record(conn,cursor,statement,parameters,context,many):
+        if statement.lstrip().upper().startswith(('ALTER TABLE','CREATE TABLE','CREATE INDEX')):ddl.append(statement)
+    event.listen(Engine,'before_cursor_execute',record)
+    try:db.init_db()
+    finally:event.remove(Engine,'before_cursor_execute',record)
+    assert ddl==[]
+
 def other():
     c=TestClient(app)
     response=c.post('/auth/register',json={'name':'Other Analyst','email':'other@example.org','password':PASSWORD})

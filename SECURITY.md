@@ -24,3 +24,15 @@ References: [OWASP password storage](https://cheatsheetseries.owasp.org/cheatshe
 
 This implementation has automated security regression tests; it has not undergone
 an independent penetration test.
+
+## Phase 4 additions
+
+Profile editing, password changes, single-use email verification/reset links and
+production verification gating are implemented. Password changes and resets revoke
+other sessions. Mail tokens are hashed in PostgreSQL and expire in 30 minutes.
+Mail links use a configured public origin and URL fragments to keep tokens out of
+HTTP request URLs. SMTP is TLS-protected in production. The frontend ships a
+restrictive Content Security Policy; downloaded reports are sandboxed.
+
+SMTP and HTTPS hosting must be configured and independently verified before
+public deployment. Local email delivery is intentionally unavailable without SMTP.

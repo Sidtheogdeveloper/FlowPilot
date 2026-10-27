@@ -10,6 +10,8 @@ parser.add_argument('--base-url',default='http://127.0.0.1:18080/api')
 args=parser.parse_args()
 root=Path(__file__).resolve().parents[1]
 with httpx.Client(base_url=args.base_url,trust_env=False,timeout=180) as client:
+    from auth_client import sign_in
+    sign_in(client)
     response=client.get('/workflows/'+args.workflow_id)
     response.raise_for_status()
     flow=response.json()

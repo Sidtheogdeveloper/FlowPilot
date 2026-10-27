@@ -130,6 +130,9 @@ def test_generic_followup_clarifies_scope_loss_and_resumes_without_overwriting(c
     assert response.status_code==200,response.text
     result=complete(client,response.json()['id'])
     assert result['revision']==2 and len(result['turns'])==2
+    chats=client.get('/workflows').json()
+    assert len(chats)==1 and chats[0]['chat_id']==base['chat_id']
+    assert chats[0]['id']==result['id'] and chats[0]['revision']==2
     original=client.get('/workflows/'+base['id']).json()
     assert original['status']=='completed' and [t['artifact'] for t in original['tasks']]==old_artifacts
 
