@@ -1,5 +1,6 @@
 import json,os,httpx
-from .catalogue import CATALOGUE,INTENT_ALIASES
+from .catalogue import CATALOGUE as ALL_CATALOGUE,INTENT_ALIASES
+CATALOGUE={k:v for k,v in ALL_CATALOGUE.items() if not k.startswith(('table_','document_'))}
 from .intent_schema import Intent,BASE_OPERATIONS,normalize_intent,intent_prompt,intent_example,check_context
 from .validator import validate_plan
 from .request_constraints import extract_constraints,enforce_plan_constraints

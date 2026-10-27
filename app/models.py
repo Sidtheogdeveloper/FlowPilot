@@ -53,6 +53,83 @@ class Dataset(Base):
     profile_ref:Mapped[str|None]=mapped_column(String,nullable=True)
     table_ref:Mapped[str|None]=mapped_column(String,nullable=True)
     sheet:Mapped[str|None]=mapped_column(String,nullable=True)
+    kind:Mapped[str]=mapped_column(String,default='tabular',server_default='tabular')
+class DatasetRevision(Base):
+    __tablename__='dataset_revisions'
+    dataset_id:Mapped[str]=mapped_column(ForeignKey('datasets.id',ondelete='CASCADE'),primary_key=True)
+    family_id:Mapped[str]=mapped_column(String,index=True)
+    revision:Mapped[int]=mapped_column(Integer)
+    created:Mapped[datetime]=mapped_column(DateTime(timezone=True),default=now)
+class ChatPreference(Base):
+    __tablename__='chat_preferences'
+    user_id:Mapped[str]=mapped_column(ForeignKey('users.id',ondelete='CASCADE'),primary_key=True)
+    chat_id:Mapped[str]=mapped_column(String,primary_key=True)
+    title:Mapped[str|None]=mapped_column(String(160),nullable=True)
+    pinned:Mapped[bool]=mapped_column(Boolean,default=False)
+    archived:Mapped[bool]=mapped_column(Boolean,default=False)
+    trashed:Mapped[bool]=mapped_column(Boolean,default=False)
+class Feedback(Base):
+    __tablename__='feedback'
+    id:Mapped[str]=mapped_column(String,primary_key=True)
+    user_id:Mapped[str]=mapped_column(ForeignKey('users.id',ondelete='CASCADE'),index=True)
+    workflow_id:Mapped[str]=mapped_column(ForeignKey('workflows.id',ondelete='CASCADE'),index=True)
+    category:Mapped[str]=mapped_column(String)
+    text:Mapped[str]=mapped_column(String(4000))
+    created:Mapped[datetime]=mapped_column(DateTime(timezone=True),default=now)
+class Schedule(Base):
+    __tablename__='schedules'
+    id:Mapped[str]=mapped_column(String,primary_key=True)
+    owner_id:Mapped[str]=mapped_column(ForeignKey('users.id',ondelete='CASCADE'),index=True)
+    workflow_id:Mapped[str]=mapped_column(ForeignKey('workflows.id',ondelete='CASCADE'))
+    interval_minutes:Mapped[int]=mapped_column(Integer)
+    use_latest:Mapped[bool]=mapped_column(Boolean,default=True)
+    active:Mapped[bool]=mapped_column(Boolean,default=True)
+    next_run:Mapped[datetime]=mapped_column(DateTime(timezone=True))
+    error:Mapped[str|None]=mapped_column(String,nullable=True)
+    created:Mapped[datetime]=mapped_column(DateTime(timezone=True),default=now)
+class ScheduleRun(Base):
+    __tablename__='schedule_runs'
+    id:Mapped[str]=mapped_column(String,primary_key=True)
+    schedule_id:Mapped[str]=mapped_column(ForeignKey('schedules.id',ondelete='CASCADE'),index=True)
+    workflow_id:Mapped[str]=mapped_column(ForeignKey('workflows.id',ondelete='CASCADE'),unique=True)
+    notified:Mapped[bool]=mapped_column(Boolean,default=False)
+    created:Mapped[datetime]=mapped_column(DateTime(timezone=True),default=now)
+class Notification(Base):
+    __tablename__='notifications'
+    id:Mapped[str]=mapped_column(String,primary_key=True)
+    owner_id:Mapped[str]=mapped_column(ForeignKey('users.id',ondelete='CASCADE'),index=True)
+    title:Mapped[str]=mapped_column(String)
+    body:Mapped[str]=mapped_column(String)
+    workflow_id:Mapped[str|None]=mapped_column(String,nullable=True)
+    read:Mapped[bool]=mapped_column(Boolean,default=False)
+    created:Mapped[datetime]=mapped_column(DateTime(timezone=True),default=now)
+class Team(Base):
+    __tablename__='teams'
+    id:Mapped[str]=mapped_column(String,primary_key=True)
+    owner_id:Mapped[str]=mapped_column(ForeignKey('users.id',ondelete='CASCADE'))
+    name:Mapped[str]=mapped_column(String)
+class TeamMember(Base):
+    __tablename__='team_members'
+    team_id:Mapped[str]=mapped_column(ForeignKey('teams.id',ondelete='CASCADE'),primary_key=True)
+    user_id:Mapped[str]=mapped_column(ForeignKey('users.id',ondelete='CASCADE'),primary_key=True)
+    role:Mapped[str]=mapped_column(String)
+class TeamInvite(Base):
+    __tablename__='team_invites'
+    id:Mapped[str]=mapped_column(String,primary_key=True)
+    team_id:Mapped[str]=mapped_column(ForeignKey('teams.id',ondelete='CASCADE'))
+    email:Mapped[str]=mapped_column(String)
+    role:Mapped[str]=mapped_column(String)
+    expires:Mapped[datetime]=mapped_column(DateTime(timezone=True))
+    consumed:Mapped[bool]=mapped_column(Boolean,default=False)
+class TeamShare(Base):
+    __tablename__='team_shares'
+    id:Mapped[str]=mapped_column(String,primary_key=True)
+    team_id:Mapped[str]=mapped_column(ForeignKey('teams.id',ondelete='CASCADE'))
+    owner_id:Mapped[str]=mapped_column(ForeignKey('users.id',ondelete='CASCADE'))
+    title:Mapped[str]=mapped_column(String)
+    snapshot:Mapped[dict]=mapped_column(JSON)
+    allowed_artifacts:Mapped[list]=mapped_column(JSON)
+    created:Mapped[datetime]=mapped_column(DateTime(timezone=True),default=now)
 class PendingPlan(Base):
     __tablename__='pending_plans'
     id:Mapped[str]=mapped_column(String,primary_key=True)
@@ -135,6 +212,7 @@ def _init_db(url=None):
         columns={table:{col['name'] for col in inspector.get_columns(table)} for table in ('datasets','workflows','pending_plans')}
         for name in ('profile_ref','table_ref','sheet'):
             if name not in columns['datasets']:connection.execute(text('ALTER TABLE datasets ADD COLUMN '+name+' VARCHAR'))
+        if 'kind' not in columns['datasets']:connection.execute(text("ALTER TABLE datasets ADD COLUMN kind VARCHAR NOT NULL DEFAULT 'tabular'"))
         for table in ('datasets','workflows','pending_plans'):
             if 'owner_id' not in columns[table]:connection.execute(text('ALTER TABLE '+table+' ADD COLUMN owner_id VARCHAR REFERENCES users(id)'))
             index='ix_'+table+'_owner_id'

@@ -36,3 +36,21 @@ restrictive Content Security Policy; downloaded reports are sandboxed.
 
 SMTP and HTTPS hosting must be configured and independently verified before
 public deployment. Local email delivery is intentionally unavailable without SMTP.
+
+## Explicit team snapshots
+
+Global dataset/workflow/artifact ownership filters remain unchanged. Teams use
+accepted email invitations and an explicit item-sharing action. Snapshot reads
+require active membership; downloads additionally require the exact artifact
+reference to be in that snapshot's allowlist. A viewer receives no permanent
+artifact grant. Editors may request private copies of explicitly shared inputs;
+those copies belong to the editor and do not expose the owner's other resources.
+Unsharing/removing membership blocks subsequent snapshot requests. Already
+downloaded or privately copied data cannot be recalled.
+
+Document content is treated as text, not instructions. Extraction is bounded by
+upload, expanded archive, extracted text, page and passage limits. The executor
+accepts approved document handlers only and checks retrieved citations against
+accepted immutable source passages. Scanned documents are not OCR-processed.
+Reuse is limited to the same owner/chat with matching executor/input fingerprints.
+Exported spreadsheet text is escaped against formula interpretation.

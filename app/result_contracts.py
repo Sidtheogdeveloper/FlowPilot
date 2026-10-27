@@ -2,6 +2,9 @@ import math
 from .handlers import COLUMNS
 
 def validate_output(handler,obj):
+    if handler.startswith('document_'):
+        from .document_analysis import validate_document_output
+        return validate_document_output(handler,obj)
     if handler.startswith('table_'):
         from .tabular import validate_table_output
         return validate_table_output(obj)

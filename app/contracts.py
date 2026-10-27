@@ -24,6 +24,7 @@ class PlanRequest(BaseModel):
     planner:Literal['template','huggingface']='template'
     policy:Literal['greedy','heft','bounded']='greedy'
 class FollowupRequest(BaseModel):
+    reuse_outputs:bool=True
     dataset_ids:list[str]|None=Field(default=None,min_length=1,max_length=8)
     model_config=ConfigDict(extra='forbid')
     request:str=Field(min_length=3,max_length=2000)

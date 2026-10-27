@@ -13,11 +13,11 @@ def validate_plan(raw):
         if t.resources.memory_mb<c['memory_mb']:errors.append(f'{t.id}: memory below catalogue minimum')
         if len(set(t.depends_on))!=len(t.depends_on):errors.append(f'{t.id}: duplicate dependencies')
         required=set(c['inputs'])-set(c.get('optional_inputs',[]))
-        if t.handler!='table_report' and (not required<=set(t.inputs) or set(t.inputs)-set(c['inputs'])):errors.append(f'{t.id}: wrong input bindings')
+        if t.handler not in ('table_report','document_search') and (not required<=set(t.inputs) or set(t.inputs)-set(c['inputs'])):errors.append(f'{t.id}: wrong input bindings')
         if t.handler=='build_report' and not set(t.inputs)&{'monthly','products','flags'}:errors.append(f'{t.id}: report requires an analytical input')
         sources=set()
         for name,source in t.inputs.items():
-            expected='table' if t.handler=='table_report' else c['inputs'].get(name)
+            expected='table' if t.handler=='table_report' else 'document' if t.handler=='document_search' else c['inputs'].get(name)
             if source=='$dataset' or source.startswith('$dataset:'):
                 if expected!='dataset':errors.append(f'{t.id}: incompatible dataset binding')
             elif source not in nodes:errors.append(f'{t.id}: dangling input {source}')
@@ -29,7 +29,7 @@ def validate_plan(raw):
         for dep in t.depends_on:
             if dep not in nodes:errors.append(f'{t.id}: dangling dependency')
             else:g.add_edge(dep,t.id)
-        if t.handler.startswith('table_'):pass
+        if t.handler.startswith(('table_','document_')):pass
         elif t.handler=='flag_unusual_amounts':
             if set(t.parameters)-{'iqr_multiplier'}:errors.append(f'{t.id}: unknown parameter')
             k=t.parameters.get('iqr_multiplier',1.5)
@@ -45,13 +45,16 @@ def validate_plan(raw):
             if set(t.parameters)-{'question'} or ('question' in t.parameters and (not isinstance(t.parameters['question'],str) or len(t.parameters['question'])>2000)):errors.append(f'{t.id}: invalid report parameters')
         elif t.parameters:errors.append(f'{t.id}: handler accepts no parameters')
     if not nx.is_directed_acyclic_graph(g):errors.append('Graph contains a cycle')
-    reports=[t for t in plan.tasks if t.handler in ('build_report','table_report')]
+    reports=[t for t in plan.tasks if t.handler in ('build_report','table_report','document_report')]
     if len(reports)!=1:errors.append('Exactly one terminal report required')
     elif g.out_degree(reports[0].id):errors.append('Report must be terminal')
     if reports and nx.is_directed_acyclic_graph(g):
         ancestors=nx.ancestors(g,reports[0].id)|{reports[0].id}
         if ancestors!=set(nodes):errors.append('All tasks must contribute to report')
     if errors:raise ValueError('; '.join(errors))
+    if any(t.handler.startswith('document_') for t in plan.tasks):
+        from .document_analysis import validate_document_plan
+        validate_document_plan(plan)
     if any(t.handler.startswith('table_') for t in plan.tasks):
         if not all(t.handler.startswith('table_') for t in plan.tasks):raise ValueError('Mixed legacy and generic plans are unsupported')
         from .tabular import validate_generic_plan

@@ -282,13 +282,13 @@ def preflight(plan,datasets):
             source=task['depends_on'][0];bounds[task['id']]=bounds[source]
             task['resources']['memory_mb']=max(task['resources']['memory_mb'],by[source]['resources']['memory_mb'])
 
-def create_table_plan(request,dataset_ids,mode,policy,parent_id=None,pending_id=None,answer=None):
+def create_table_plan(request,dataset_ids,mode,policy,parent_id=None,pending_id=None,answer=None,reuse_outputs=True):
     history=[];confirmations=[];cached_intent=None;cached_record=None
     with db.Session.begin() as session:
         pending=session.get(db.PendingPlan,pending_id,with_for_update=True) if pending_id else None
         if pending_id and (not pending or pending.payload.get('consumed')):raise ValueError('Clarification is missing or already resolved')
         if pending:
-            value=pending.payload;request=value['request'];dataset_ids=value['dataset_ids'];mode=value['mode'];policy=value['policy'];parent_id=value.get('parent_id')
+            value=pending.payload;request=value['request'];dataset_ids=value['dataset_ids'];mode=value['mode'];policy=value['policy'];parent_id=value.get('parent_id');reuse_outputs=value.get('reuse_outputs',True)
             history=value.get('history',[])+[{'question':value['question'],'answer':answer}];confirmations=value.get('confirmations',[])
             cached_intent=value.get('intent')
             cached_record=value.get('proposal_record')
@@ -333,7 +333,7 @@ def create_table_plan(request,dataset_ids,mode,policy,parent_id=None,pending_id=
                     col=next((c['name'] for c in ensure_metadata(table)['columns'] if c['id']==match[2]),key)
                     return table.filename+'.'+col+' ('+key+')'
                 question+=' Columns: '+', '.join(label(k) for k in signature['left_keys'])+' → '+', '.join(label(k) for k in signature['right_keys'])+'.'
-            value={'request':request,'dataset_ids':dataset_ids,'mode':mode,'policy':policy,'parent_id':parent_id,'profiles':snapshots,
+            value={'request':request,'dataset_ids':dataset_ids,'mode':mode,'policy':policy,'parent_id':parent_id,'profiles':snapshots,'reuse_outputs':reuse_outputs,
                    'question':question,'candidates':candidates,'confirmation':confirmation,'confirmations':confirmations,'history':history,'intent':locals().get('intent') if confirmation else None,'proposal_record':locals().get('record') if confirmation else None}
             if pending:pending.payload=value
             else:session.add(db.PendingPlan(id=identity,payload=value))
@@ -348,9 +348,13 @@ def create_table_plan(request,dataset_ids,mode,policy,parent_id=None,pending_id=
             revision=len(flows)+1
             chat_title=(flows[0].planner or {}).get('chat_title') or (flows[0].planner or {}).get('request',chat_title)
         record=dict(record,kind='tabular',intent=intent,dataset_ids=dataset_ids,profiles=profiles,request=request,planner_mode=mode,chat_id=chat_id,chat_title=chat_title,revision=revision,parent_workflow_id=parent_id,clarification_history=history,confirmations=confirmations)
+        from .reuse import executor_version,reuse_completed
+        record['executor_version']=executor_version()
         flow=db.Workflow(id=identity,dataset_id=dataset_ids[0],plan=plan,planner=record,policy=policy)
         session.add(flow);session.flush()
         for task in plan['tasks']:session.add(db.TaskRow(id=identity+':'+task['id'],workflow_id=identity,task_id=task['id'],spec=task))
+        session.flush()
+        if reuse_outputs and parent:reuse_completed(session,flow,parent)
         if pending:pending.payload=dict(pending.payload,consumed=True,workflow_id=identity)
     from .api import detail
     return dict(detail(identity),state='ready')

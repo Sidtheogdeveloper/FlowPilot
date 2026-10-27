@@ -9,6 +9,9 @@ def inspect_csv(data):
     return df
 
 def execute(handler,inputs,parameters):
+    if handler.startswith('document_'):
+        from .document_analysis import execute_document
+        return execute_document(handler,inputs,parameters)
     if handler.startswith('table_'):
         from .tabular import execute_table
         return execute_table(handler,inputs,parameters)

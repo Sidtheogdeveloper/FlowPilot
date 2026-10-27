@@ -15,9 +15,11 @@ from .coordinator import loop,command
 async def lifespan(app):
     from .account_features import validate_deployment
     validate_deployment()
+    from .product_jobs import loop as jobs_loop
     db.init_db();stop=threading.Event();thread=threading.Thread(target=loop,args=(stop,),daemon=True);thread.start()
+    jobs=threading.Thread(target=jobs_loop,args=(stop,),daemon=True);jobs.start()
     yield
-    stop.set();thread.join(5)
+    stop.set();thread.join(5);jobs.join(6)
 app=FastAPI(title='FlowPilot',lifespan=lifespan)
 app.add_middleware(CORSMiddleware,allow_origins=['http://localhost:5173','http://localhost:4173'],allow_credentials=True,allow_methods=['*'],allow_headers=['*'])
 from .auth import AuthenticationMiddleware,router as account_router
@@ -32,8 +34,8 @@ def catalogue():return CATALOGUE
 
 def dataset_info(dataset):
     from .tables import ensure_metadata
-    description=ensure_metadata(dataset)
-    return {'id':dataset.id,'filename':dataset.filename,'rows':dataset.rows,'columns':[c['name'] for c in description['columns']],'artifact':dataset.artifact,'profile_ref':dataset.profile_ref,'profile':description,'sheet':dataset.sheet}
+    description=artifacts.read_json(dataset.profile_ref) if dataset.kind=='document' else ensure_metadata(dataset)
+    return {'id':dataset.id,'kind':dataset.kind,'filename':dataset.filename,'rows':dataset.rows,'columns':[c['name'] for c in description['columns']],'artifact':dataset.artifact,'profile_ref':dataset.profile_ref,'profile':description,'sheet':dataset.sheet}
 
 def workflow_info(flow,dataset):
     record=flow.planner or {}
@@ -50,7 +52,7 @@ def workflow_info(flow,dataset):
 def datasets():
     with db.Session.begin() as s:
         query=(select(db.Dataset,func.count(db.Workflow.id),func.max(db.Workflow.created))
-               .outerjoin(db.Workflow,db.Workflow.dataset_id==db.Dataset.id).group_by(db.Dataset.id)
+               .outerjoin(db.Workflow,db.Workflow.dataset_id==db.Dataset.id).where(db.Dataset.kind=='tabular').group_by(db.Dataset.id)
                .order_by(func.max(db.Workflow.created).desc().nullslast(),db.Dataset.filename,db.Dataset.id))
         return [dict(dataset_info(dataset),workflow_count=count,last_used=last.isoformat() if last else None)
                 for dataset,count,last in s.execute(query)]
@@ -92,7 +94,7 @@ def dataset_profile(identity:str):
         dataset=session.get(db.Dataset,identity)
         if not dataset:raise HTTPException(404,'Dataset not found')
         from .tables import ensure_metadata
-        return dict(ensure_metadata(dataset),profile_ref=dataset.profile_ref)
+        return dict(artifacts.read_json(dataset.profile_ref) if dataset.kind=='document' else ensure_metadata(dataset),profile_ref=dataset.profile_ref)
 
 @app.post('/clarifications/{identity}/answer')
 def answer_clarification(identity:str,payload:dict):
@@ -118,6 +120,7 @@ def create_plan(req:PlanRequest):
     with db.Session.begin() as session:
         selected=[session.get(db.Dataset,i) for i in identities]
         if any(d is None for d in selected):raise HTTPException(404,'Dataset not found')
+        if any(d.kind!='tabular' for d in selected):raise HTTPException(422,'Use document analysis for document files')
         generic=req.generic or len(identities)>1 or dataset_info(selected[0])['columns']!=COLUMNS
     if generic:
         from .table_planning import create_table_plan
@@ -138,7 +141,8 @@ def create_plan(req:PlanRequest):
         for t in plan.tasks:s.add(db.TaskRow(id=id+':'+t.id,workflow_id=id,task_id=t.id,spec=t.model_dump()))
     return detail(id)
 @app.get('/workflows')
-def workflows():
+def workflows(view:str='active'):
+    if view not in ('active','archived','trash'):raise HTTPException(422,'Unknown chat view')
     with db.Session() as s:
         latest={}
         for flow,dataset in s.execute(select(db.Workflow,db.Dataset).join(db.Dataset,db.Workflow.dataset_id==db.Dataset.id).order_by(db.Workflow.created.desc(),db.Workflow.id)):
@@ -147,7 +151,8 @@ def workflows():
                 item['search_text']=item['request'] or ''
                 latest[item['chat_id']]=item
             else:latest[item['chat_id']]['search_text']+='\n'+(item['request'] or '')
-        return list(latest.values())
+        from .product import preferences
+        return preferences(list(latest.values()),view)
 
 def chat_flows(s,chat_id):
     return list(s.scalars(select(db.Workflow).where(or_(db.Workflow.id==chat_id,db.Workflow.planner['chat_id'].as_string()==chat_id)).order_by(db.Workflow.created,db.Workflow.id)))
@@ -161,7 +166,9 @@ def workflow_detail(s,f):
         tasks.append({'id':t.task_id,'handler':t.spec['handler'],'status':t.status,'attempts':attempts,'artifact':t.artifact})
     events=[{'kind':e.kind,'data':e.data,'created':e.created.isoformat()} for e in s.scalars(select(db.Event).where(db.Event.workflow_id==f.id).order_by(db.Event.id))]
     sched=[e['data']['elapsed_ms'] for e in events if e['kind']=='scheduling']
-    insights=None;report=next((t for t in rows if t.spec['handler'] in ('build_report','table_report') and t.status=='completed' and t.artifact),None)
+    reused={e['data']['task'] for e in events if e['kind']=='task_reused'}
+    for task in tasks:task['reused']=task['id'] in reused
+    insights=None;report=next((t for t in rows if t.spec['handler'] in ('build_report','table_report','document_report') and t.status=='completed' and t.artifact),None)
     if report:
         from .insights import build_insights
         content=artifacts.read(report.artifact).decode('utf-8')
@@ -192,6 +199,10 @@ def detail(id):
         f=s.get(db.Workflow,id)
         if not f:raise HTTPException(404,'Workflow not found')
         item=workflow_detail(s,f);flows=chat_flows(s,item['chat_id'])
+        from .tenancy import owner
+        if owner.get():
+            pref=s.get(db.ChatPreference,(owner.get(),item['chat_id']))
+            if pref and pref.title:item['title']=pref.title
         item['turns']=[workflow_detail(s,flow) for flow in flows]
         item['latest_workflow_id']=flows[-1].id
         return item
@@ -205,7 +216,7 @@ def followup(id,req:FollowupRequest):
         else:identities=None
     if identities:
         from .table_planning import create_table_plan
-        try:return create_table_plan(req.request,identities,mode,policy,parent_id=id)
+        try:return create_table_plan(req.request,identities,mode,policy,parent_id=id,reuse_outputs=req.reuse_outputs)
         except httpx.HTTPError as exc:raise HTTPException(503,'Local table model is unavailable or timed out; retry after the model service is ready')
         except (ValueError,TypeError) as exc:raise HTTPException(409,str(exc))
     from .followups import propose_followup
@@ -237,9 +248,9 @@ def narrative_report(id):
     from .insights import render_report
     item=detail(id)
     if not item['insights']:raise HTTPException(409,'Report is not available yet')
-    if item['insights'].get('kind')=='tabular':
+    if item['insights'].get('kind') in ('tabular','document'):
         with db.Session() as session:
-            row=session.scalar(select(db.TaskRow).where(db.TaskRow.workflow_id==id,db.TaskRow.spec['handler'].as_string()=='table_report'))
+            row=session.scalar(select(db.TaskRow).where(db.TaskRow.workflow_id==id,db.TaskRow.spec['handler'].as_string().in_(['table_report','document_report'])))
             content=artifacts.read(row.artifact)
     else:content=render_report(item['insights'],'').encode()
     return Response(content,media_type='text/html',headers={'Content-Disposition':f'attachment; filename="dataset-insights-v{item["revision"]}.html"'})
@@ -259,4 +270,13 @@ def download(id):
     if not owns_artifact(id):raise HTTPException(404,'Artifact not found')
     try:data=artifacts.read(id)
     except (ValueError,FileNotFoundError):raise HTTPException(404,'Artifact not found')
-    return Response(data,media_type='text/html' if id.endswith('.html') else 'application/json' if id.endswith('.json') else 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' if id.endswith('.xlsx') else 'text/csv',headers={'Content-Disposition':'attachment; filename="'+id+'"'})
+    media={'.html':'text/html','.json':'application/json','.xlsx':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','.pdf':'application/pdf','.docx':'application/vnd.openxmlformats-officedocument.wordprocessingml.document','.txt':'text/plain','.md':'text/markdown'}
+    return Response(data,media_type=next((m for suffix,m in media.items() if id.endswith(suffix)),'text/csv'),headers={'Content-Disposition':'attachment; filename="'+id+'"'})
+
+from .product import router as product_router
+from .document_analysis import router as document_router
+app.include_router(product_router)
+app.include_router(document_router)
+
+from .team_spaces import router as team_router
+app.include_router(team_router)

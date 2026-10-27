@@ -73,3 +73,43 @@ Light, Dark or the device setting, and Comfortable or Focused workspace layouts.
 Preferences are saved on this device and followed across tabs. Navigation collapses
 on narrow screens. The composer remains visible while the conversation scrolls.
 Transitions, loading indicators and progress states respect reduced-motion settings.
+
+## Analysis and collaboration tools
+
+- **Dataset library:** paginated source previews, column quality summaries and
+  numeric distributions. Upload a new CSV/Excel version without overwriting the
+  original. Matching headers retain stable column IDs; saved workflow versions
+  keep their original inputs.
+- **Results:** interactive bar/line charts with selectable measures and labels,
+  calculated-row previews, PDF findings, selected-result CSV and multi-sheet Excel
+  exports. Charts show at most 20 observations; exports include complete accepted
+  analytical results. Spreadsheet formula-like text is escaped.
+- **Conversations:** rename, search across questions, pin, archive, move to
+  recoverable trash and restore. Each follow-up stays in the original chat.
+- **Workflow tools:** compare added, removed and changed DAG definitions; optionally
+  reuse unchanged accepted subtrees within the same owner's conversation. Reuse
+  checks executor/dependency versions, operation parameters, input fingerprints,
+  output contracts and artifact checksums. Reports are regenerated.
+- **Feedback:** record correct/incorrect results, inefficient workflows and
+  suggestions. Feedback and uploads never automatically retrain a model.
+- **Schedules:** repeat a saved validated analysis hourly, daily or weekly, with
+  optional latest uploaded dataset versions. Schedule controls and completion/
+  failure notifications are under **Activity & teams**. The application and
+  workers must remain running. Delivery is in-app, not email or push.
+- **Documents:** PDF, DOCX, UTF-8 text and Markdown uploads support bounded
+  extractive search/overview workflows, quoted evidence and source-passage
+  inspection. This is keyword-ranked extraction, not semantic RAG or free-form
+  generated answering. Scanned PDFs require external OCR; encrypted PDFs are
+  rejected. Table and document inputs use separate workflows.
+- **Team spaces:** invite an email as viewer or editor; recipients accept in-app.
+  Explicitly share an immutable dataset/conversation snapshot. Every snapshot
+  download checks current membership and the exact artifact allowlist. Viewers
+  read/download; editors create private editable copies and execute them in their
+  own account. Originals are never edited collaboratively. Removing membership or
+  stopping a share revokes future snapshot access; downloaded/private copies
+  cannot be recalled.
+
+All tools use the existing authenticated API. Team sharing does not widen the
+global owner filter. No third-party model or mail service is required for
+document extraction, exports, charts or in-app notifications. PDF exports use an
+embedded font with limited character coverage; Excel/CSV retain Unicode text.

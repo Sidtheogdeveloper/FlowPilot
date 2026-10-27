@@ -116,6 +116,20 @@ def finish(attempt_id,worker_generation,artifact=None,error=None):
                 output=artifacts.read_json(artifact)
                 from .result_contracts import validate_output
                 validate_output(t.spec['handler'],output)
+                if t.spec['handler']=='document_load':
+                    identity=t.spec['inputs']['dataset'].split(':',1)[1]
+                    if identity not in flow.planner.get('dataset_ids',[]):raise ValueError('Unbound document')
+                    source=s.get(db.Dataset,identity)
+                    if not source or output!=artifacts.read_json(source.table_ref):raise ValueError('Document output differs from its immutable source')
+                elif t.spec['handler']=='document_search':
+                    allowed={}
+                    for source_id in t.spec['inputs'].values():
+                        source=s.scalar(select(db.TaskRow).where(db.TaskRow.workflow_id==flow.id,db.TaskRow.task_id==source_id))
+                        doc=artifacts.read_json(source.artifact)
+                        for c in doc['chunks']:allowed[(doc['document_id'],c['id'])]=(doc,c)
+                    for cite in output['citations']:
+                        pair=allowed.get((cite['document_id'],cite['chunk_id']))
+                        if not pair or cite['text']!=pair[1]['text'] or cite['page']!=pair[1]['page'] or cite['filename']!=pair[0]['filename'] or cite['location']!=pair[0]['location']:raise ValueError('Citation does not match an accepted source passage')
                 if t.spec['handler'].startswith('table_'):
                     from .tabular import validate_generic_plan
                     from .contracts import Plan

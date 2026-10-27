@@ -12,3 +12,8 @@ INTENT_ALIASES={'calculate_monthly_sales':'monthly_sales','calculate_product_per
 # Generic operations keep legacy handlers and their artifact contracts intact.
 for _op in ('load','profile','convert','filter','join','derive','aggregate','time','sort','outliers','deduplicate','fill_missing','report'):
     CATALOGUE['table_'+_op]={'inputs':{'dataset':'dataset'} if _op=='load' else {'left':'table','right':'table'} if _op=='join' else {} if _op=='report' else {'table':'table'},'output':'report' if _op=='report' else 'table','memory_mb':128}
+CATALOGUE.update({
+    'document_load':{'inputs':{'dataset':'dataset'},'output':'document','memory_mb':128},
+    'document_search':{'inputs':{},'output':'evidence','memory_mb':128},
+    'document_report':{'inputs':{'evidence':'evidence'},'output':'report','memory_mb':128},
+})

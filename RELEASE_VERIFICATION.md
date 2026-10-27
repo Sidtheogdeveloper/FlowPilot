@@ -41,3 +41,28 @@ light/dark themes, persistence after reload, the 230px Focused sidebar, desktop
 and narrow-screen layouts, conversation history, themed DAGs and composer visibility.
 Backend code is unchanged by this UI update; the previous 177-test backend result
 remains the recorded backend validation.
+
+## Product tools update — 27 October 2026
+
+- **188 backend tests passed** against the isolated PostgreSQL workflow_test
+  database. New checks cover paginated previews, stable column IDs in updated
+  inputs, calculated exports, recoverable chat controls, feedback, reuse and
+  invalidation, due schedules and notification deduplication, document parsers/
+  exact source citations, inert injected document text, and team invitations,
+  item allowlists, viewer/editor permissions, private copies and revocation.
+- **32 frontend tests passed** and the TypeScript/production build succeeded.
+  Chart checks cover missing/nonfinite values, signed axes and preview limits;
+  conversation checks include pinned and document chats.
+- Live Docker smoke checks completed tabular and document workflows through the
+  frontend proxy with PostgreSQL and registered workers A, B and C. A follow-up
+  reused two unchanged steps; CSV, Excel and parseable PDF downloads succeeded.
+  This is a functional smoke check, not evidence that all three workers execute
+  a single small workflow simultaneously.
+- Browser checks covered dataset previews/distributions, chat controls, results
+  charts/exports and version comparisons with the themed UI.
+
+Known scope: documents use extractive keyword retrieval without OCR or semantic
+generation; collaboration shares frozen snapshots and private editable copies;
+schedule delivery is in-app while services are running. PDF font coverage is
+limited. These tests do not constitute an independent security audit or a
+performance/generalization benchmark.
