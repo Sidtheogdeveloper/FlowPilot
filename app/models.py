@@ -112,16 +112,32 @@ class Event(Base):
     created:Mapped[datetime]=mapped_column(DateTime(timezone=True),default=now)
 ENGINE=None;Session=None
 def init_db(url=None):
+    import time,logging
+    from sqlalchemy.exc import OperationalError
+    for attempt in range(20):
+        try:return _init_db(url)
+        except OperationalError:
+            if ENGINE is not None:ENGINE.dispose()
+            if attempt==19:raise
+            logging.warning('Database is not ready during startup; retrying shortly')
+            time.sleep(min(2,.25*(attempt+1)))
+
+def _init_db(url=None):
     global ENGINE,Session
     url=url or os.getenv('DATABASE_URL','postgresql+psycopg://workflow:workflow@localhost:5432/workflow')
     if not url.startswith('postgresql'):raise ValueError('PostgreSQL is required; SQLite is not a concurrency substitute')
-    ENGINE=create_engine(url,pool_pre_ping=True);Session=sessionmaker(ENGINE,expire_on_commit=False);Base.metadata.create_all(ENGINE)
-    from sqlalchemy import text
+    ENGINE=create_engine(url,pool_pre_ping=True,connect_args={'connect_timeout':5});Session=sessionmaker(ENGINE,expire_on_commit=False)
+    from sqlalchemy import text,inspect
     with ENGINE.begin() as connection:
+        connection.execute(text('SELECT pg_advisory_xact_lock(918234)'))
+        Base.metadata.create_all(connection)
+        inspector=inspect(connection)
+        columns={table:{col['name'] for col in inspector.get_columns(table)} for table in ('datasets','workflows','pending_plans')}
         for name in ('profile_ref','table_ref','sheet'):
-            connection.execute(text('ALTER TABLE datasets ADD COLUMN IF NOT EXISTS '+name+' VARCHAR'))
+            if name not in columns['datasets']:connection.execute(text('ALTER TABLE datasets ADD COLUMN '+name+' VARCHAR'))
         for table in ('datasets','workflows','pending_plans'):
-            connection.execute(text('ALTER TABLE '+table+' ADD COLUMN IF NOT EXISTS owner_id VARCHAR REFERENCES users(id)'))
-            connection.execute(text('CREATE INDEX IF NOT EXISTS ix_'+table+'_owner_id ON '+table+' (owner_id)'))
+            if 'owner_id' not in columns[table]:connection.execute(text('ALTER TABLE '+table+' ADD COLUMN owner_id VARCHAR REFERENCES users(id)'))
+            index='ix_'+table+'_owner_id'
+            if index not in {i['name'] for i in inspector.get_indexes(table)}:connection.execute(text('CREATE INDEX '+index+' ON '+table+' (owner_id)'))
     from .tenancy import install
     install()
