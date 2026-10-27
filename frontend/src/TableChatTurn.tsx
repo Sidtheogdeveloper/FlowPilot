@@ -4,6 +4,7 @@ import type {Workflow} from './types';
 type TableInsights={sections?:{title:string;findings:string[];artifact:string;audit:unknown[]}[]};
 export function TableChatTurn({turn,latest,busy,onAction}:{turn:Workflow;latest:boolean;busy:boolean;onAction:(action:string)=>void}){
  const insights=turn.insights as unknown as TableInsights|null;
+ const completed=turn.tasks.filter(task=>['completed','accepted','succeeded'].includes(task.status)).length;
  const warnings=(turn as Workflow&{capacity_warnings?:string[]}).capacity_warnings;
  return <section className="conversation-turn" aria-label={`Conversation turn ${turn.revision||1}`}>
   <div className="user-message"><span>You</span><p>{turn.request}</p></div>
@@ -11,6 +12,7 @@ export function TableChatTurn({turn,latest,busy,onAction}:{turn:Workflow;latest:
    <p className="turn-caption">DAG version {turn.revision||1} · {turn.plan.tasks.length} approved operations</p>
    {turn.status==='planned'&&<p>Your workflow is validated and ready. Review the steps below, then run it.</p>}
    {turn.status==='running'&&<p role="status">Analysing your data. Results will appear here when the workflow completes.</p>}
+   {turn.status==='running'&&<div className="run-progress"><progress aria-label="Completed workflow operations" value={completed} max={Math.max(1,turn.tasks.length)}/><span>{completed} / {turn.tasks.length} completed</span></div>}
    {turn.status==='failed'&&<p role="alert">This run did not complete. Review the task details or ask a revised question.</p>}
    {turn.status==='cancelled'&&<p>This run was cancelled. Previously accepted outputs remain available.</p>}
    {warnings?.map(w=><p role="status" key={w}>{w}</p>)}

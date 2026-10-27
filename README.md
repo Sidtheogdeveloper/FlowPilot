@@ -65,3 +65,11 @@ HTTPS and a working SMTP provider are required for production registration,
 verification and recovery. Local HTTP is a development mode. No public host or
 mail-provider account is provisioned by this repository. Existing anonymous data
 stays unassigned until the operator approves migration.
+
+## Appearance
+
+Use **Appearance** in the top bar (also available on the sign-in screen). Choose
+Light, Dark or the device setting, and Comfortable or Focused workspace layouts.
+Preferences are saved on this device and followed across tabs. Navigation collapses
+on narrow screens. The composer remains visible while the conversation scrolls.
+Transitions, loading indicators and progress states respect reduced-motion settings.

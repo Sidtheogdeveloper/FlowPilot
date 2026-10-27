@@ -31,3 +31,13 @@ from earlier work are not reclassified as production-security measurements.
 
 Local raw evidence remains under the ignored evidence folder. No credentials,
 raw session tokens, user uploads or local model weights are included in Git.
+
+## Appearance update
+
+The UI update passes 28 frontend tests and the TypeScript/production build.
+New checks cover saved appearance settings, system-theme resolution, malformed
+storage and theme initialization before React renders. Browser checks cover
+light/dark themes, persistence after reload, the 230px Focused sidebar, desktop
+and narrow-screen layouts, conversation history, themed DAGs and composer visibility.
+Backend code is unchanged by this UI update; the previous 177-test backend result
+remains the recorded backend validation.
