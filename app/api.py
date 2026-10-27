@@ -280,3 +280,6 @@ app.include_router(document_router)
 
 from .team_spaces import router as team_router
 app.include_router(team_router)
+
+from .planning_tools import router as planning_tools_router
+app.include_router(planning_tools_router)

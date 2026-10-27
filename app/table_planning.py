@@ -320,6 +320,8 @@ def create_table_plan(request,dataset_ids,mode,policy,parent_id=None,pending_id=
             plan['tasks'][-1]['parameters']['question']=request
             validate_plan(plan)
             preflight(plan,datasets)
+            from .partitioning import prepare_execution
+            plan,execution=prepare_execution(session,plan,datasets)
         except Clarification as exc:
             identity=pending_id or str(uuid.uuid4());candidates=exc.candidates
             confirmation=candidates[0] if len(candidates)==1 and (str(candidates[0]).startswith('{') or str(candidates[0]).startswith('many:')) else None
@@ -350,6 +352,7 @@ def create_table_plan(request,dataset_ids,mode,policy,parent_id=None,pending_id=
         record=dict(record,kind='tabular',intent=intent,dataset_ids=dataset_ids,profiles=profiles,request=request,planner_mode=mode,chat_id=chat_id,chat_title=chat_title,revision=revision,parent_workflow_id=parent_id,clarification_history=history,confirmations=confirmations)
         from .reuse import executor_version,reuse_completed
         record['executor_version']=executor_version()
+        record['execution']=execution
         flow=db.Workflow(id=identity,dataset_id=dataset_ids[0],plan=plan,planner=record,policy=policy)
         session.add(flow);session.flush()
         for task in plan['tasks']:session.add(db.TaskRow(id=identity+':'+task['id'],workflow_id=identity,task_id=task['id'],spec=task))

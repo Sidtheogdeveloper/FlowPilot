@@ -11,10 +11,22 @@ COST.update({k:.0001 for k in CATALOGUE if k.startswith('document_')})
 def estimates(session,rows):
     if os.getenv('ESTIMATE_HISTORY','1')=='0':return {k:max(.01,rows*v) for k,v in COST.items()}
     samples={k:[] for k in COST}
-    recent=list(session.scalars(select(db.Attempt).where(db.Attempt.status=='completed').order_by(db.Attempt.finished.desc()).limit(100)))
-    for a in recent:
+    query=(select(db.Attempt,db.TaskRow,db.Workflow,db.Dataset,db.Worker)
+           .join(db.TaskRow,db.TaskRow.id==db.Attempt.task_key)
+           .join(db.Workflow,db.Workflow.id==db.TaskRow.workflow_id)
+           .join(db.Dataset,db.Dataset.id==db.Workflow.dataset_id)
+           .join(db.Worker,db.Worker.id==db.Attempt.worker_id)
+           .where(db.Attempt.status=='completed').order_by(db.Attempt.finished.desc()).limit(100))
+    # Including owner-scoped Workflow/Dataset in the join excludes foreign history.
+    for a,t,f,d,w in session.execute(query):
         if not a.started or not a.finished:continue
-        t=session.get(db.TaskRow,a.task_key);f=session.get(db.Workflow,t.workflow_id);d=session.get(db.Dataset,f.dataset_id);w=session.get(db.Worker,a.worker_id)
-        samples[t.spec['handler']].append((a.finished-a.started).total_seconds()*w.speed/max(d.rows,1))
+        n=(f.planner or {}).get('execution',{}).get('row_estimates',{}).get(t.task_id,d.rows)
+        samples.setdefault(t.spec['handler'],[]).append((a.finished-a.started).total_seconds()*w.speed/max(n,1))
     return {k:max(.01,rows*(median(samples[k]) if samples[k] else v)) for k,v in COST.items()}
 
+
+def task_estimates(session,flow):
+    dataset=session.get(db.Dataset,flow.dataset_id)
+    base=estimates(session,dataset.rows)
+    counts=(flow.planner or {}).get('execution',{}).get('row_estimates',{})
+    return {t['id']:max(.01,base[t['handler']]*counts.get(t['id'],dataset.rows)/max(1,dataset.rows)) for t in flow.plan['tasks']}

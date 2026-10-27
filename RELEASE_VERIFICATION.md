@@ -66,3 +66,24 @@ generation; collaboration shares frozen snapshots and private editable copies;
 schedule delivery is in-app while services are running. PDF font coverage is
 limited. These tests do not constitute an independent security audit or a
 performance/generalization benchmark.
+
+## Partitioning, estimates, optional editing and drift
+
+- 200 backend tests and 34 frontend tests passed; the production UI build passed.
+  Added checks compare partitioned and original grouped/global calculations,
+  weighted averages with unequal chunks, null groups, empty filter results and
+  merged exclusion counts. Non-decomposable functions retain the global path.
+- Tests verify invalid edits leave the old preview intact, edited joins require
+  confirmation, new versions stay in the same chat, source filters execute
+  correctly, foreign workflow history is excluded from owner-scoped estimates,
+  and schema/missingness/distribution changes are detected.
+- A live synthetic 150,003-row aggregation produced 10 tasks (four chunk loads,
+  four partial aggregations, one reducer and one report). Workers A, B and C all
+  executed tasks. Independent totals A=599990 and B=600004 exactly matched the
+  accepted results. This single run is functional evidence, not a speed benchmark.
+- The advisory estimate was 4.075 seconds; observed workflow execution was
+  0.958924 seconds. The difference demonstrates that timing estimates are not
+  calibrated guarantees. Chunk preparation/model planning are outside that timing.
+- A live edited source filter excluded two rows and produced the expected
+  four-row profile. A synthetic updated dataset flagged an added column, a
+  25-percentage-point missing-rate increase and KS distance 1.0.

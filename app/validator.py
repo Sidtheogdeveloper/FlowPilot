@@ -13,11 +13,11 @@ def validate_plan(raw):
         if t.resources.memory_mb<c['memory_mb']:errors.append(f'{t.id}: memory below catalogue minimum')
         if len(set(t.depends_on))!=len(t.depends_on):errors.append(f'{t.id}: duplicate dependencies')
         required=set(c['inputs'])-set(c.get('optional_inputs',[]))
-        if t.handler not in ('table_report','document_search') and (not required<=set(t.inputs) or set(t.inputs)-set(c['inputs'])):errors.append(f'{t.id}: wrong input bindings')
+        if t.handler not in ('table_report','table_reduce','document_search') and (not required<=set(t.inputs) or set(t.inputs)-set(c['inputs'])):errors.append(f'{t.id}: wrong input bindings')
         if t.handler=='build_report' and not set(t.inputs)&{'monthly','products','flags'}:errors.append(f'{t.id}: report requires an analytical input')
         sources=set()
         for name,source in t.inputs.items():
-            expected='table' if t.handler=='table_report' else 'document' if t.handler=='document_search' else c['inputs'].get(name)
+            expected='table' if t.handler in ('table_report','table_reduce') else 'document' if t.handler=='document_search' else c['inputs'].get(name)
             if source=='$dataset' or source.startswith('$dataset:'):
                 if expected!='dataset':errors.append(f'{t.id}: incompatible dataset binding')
             elif source not in nodes:errors.append(f'{t.id}: dangling input {source}')

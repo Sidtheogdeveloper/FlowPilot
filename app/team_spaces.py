@@ -155,6 +155,8 @@ def fork_share(key:str):
             from .table_planning import preflight
             preflight(plan,selected)
             record['profiles']=profiles
+            from .partitioning import prepare_execution
+            plan,record['execution']=prepare_execution(s,plan,selected,record.get('execution',{}).get('enabled',True))
         wid=str(uuid.uuid4());record.update(chat_id=wid,revision=1,parent_workflow_id=None,dataset_ids=ids,source_share=key,executor_version=executor_version())
         f=db.Workflow(id=wid,dataset_id=ids[0],plan=plan,planner=record,policy=payload['policy']);s.add(f);s.flush()
         for t in plan['tasks']:s.add(db.TaskRow(id=wid+':'+t['id'],workflow_id=wid,task_id=t['id'],spec=t))

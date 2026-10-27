@@ -7,7 +7,7 @@ from . import models as db,artifacts
 
 def executor_version():
     root=Path(__file__).parent
-    code=b''.join((root/name).read_bytes() for name in ('tables.py','tabular.py','catalogue.py','result_contracts.py','document_analysis.py') if (root/name).exists())
+    code=b''.join((root/name).read_bytes() for name in ('tables.py','tabular.py','catalogue.py','result_contracts.py','document_analysis.py','partitioning.py') if (root/name).exists())
     versions='|'.join(importlib.metadata.version(name) for name in ('pandas','networkx','openpyxl','pypdf','reportlab'))
     return hashlib.sha256(code+versions.encode()).hexdigest()
 

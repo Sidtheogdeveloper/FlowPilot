@@ -208,7 +208,10 @@ def validate_generic_plan(plan):
     if not nx.is_directed_acyclic_graph(g):raise ValueError('Graph contains a cycle')
     for tid in nx.topological_sort(g):
         t=by[tid];op=t.handler.removeprefix('table_')
-        if op=='load':
+        if op in ('load_chunk','partial','reduce'):
+            from .partitioning import validate_partition_node
+            schemas[tid]=validate_partition_node(t,schemas,by)
+        elif op=='load':
             exact(t.parameters,['alias','schema'])
             if not t.inputs.get('dataset','').startswith('$dataset:'):raise ValueError('Table loader requires dataset identity')
             schemas[tid]=t.parameters['schema']
@@ -268,6 +271,9 @@ def check_join(left,right,p):
 
 def execute_table(handler,inputs,p):
     op=handler.removeprefix('table_')
+    if op in ('load_chunk','partial','reduce'):
+        from .partitioning import execute_partition
+        return execute_partition(handler,inputs,p)
     if op=='report':return table_report(inputs,p)
     if op=='load':
         raw=artifacts.read_json(inputs['dataset']);schema=p['schema']

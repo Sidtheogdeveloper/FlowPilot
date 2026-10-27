@@ -51,8 +51,9 @@ def tick():
                 continue
             if all(t.status=='completed' for t in tasks):flow.status='completed';flow.finished=now;event(s,flow.id,'workflow_completed',{});continue
             ready=[t for t in tasks if t.status=='pending' and all(by[d].status=='completed' for d in t.spec['depends_on'])]
-            from .estimation import estimates
+            from .estimation import estimates,task_estimates
             predicted=estimates(s,s.get(db.Dataset,flow.dataset_id).rows)
+            per_task=task_estimates(s,flow)
             snapshot=[]
             for w in workers:
                 if w.heartbeat<now-timedelta(seconds=LEASE_SECONDS):continue
@@ -63,10 +64,10 @@ def tick():
             for t in tasks:
                 for dep in t.spec['depends_on']:g.add_edge(dep,t.task_id)
             ranks={}
-            for key in reversed(list(nx.topological_sort(g))):ranks[key]=predicted[by[key].spec['handler']]+max((ranks[n] for n in g.successors(key)),default=0)
+            for key in reversed(list(nx.topological_sort(g))):ranks[key]=per_task[key]+max((ranks[n] for n in g.successors(key)),default=0)
             order={t['id']:i for i,t in enumerate(flow.plan['tasks'])}
             ordered=sorted(ready,key=lambda t:(-ranks[t.task_id],t.task_id)) if flow.policy in ('heft','bounded') else sorted(ready,key=lambda t:order[t.task_id])
-            specs=[dict(t.spec,rank=ranks[t.task_id],estimate=predicted[t.spec['handler']]) for t in ordered]
+            specs=[dict(t.spec,rank=ranks[t.task_id],estimate=per_task[t.task_id]) for t in ordered]
             decision=schedule(specs,snapshot,flow.policy)
             if ready:event(s,flow.id,'scheduling',decision.metrics)
             for tid,wid in decision.assignments.items():
@@ -92,6 +93,10 @@ def claim(worker_id,generation):
                 if identity not in (flow.planner or {}).get('dataset_ids',[]):raise ValueError('Dataset is not bound to workflow')
                 bound=s.get(db.Dataset,identity)
                 if not bound or not bound.table_ref:raise ValueError('Missing profiled table')
+                if t.spec['handler']=='table_load_chunk':
+                    p=t.spec['parameters'];part=s.get(db.DatasetPartition,(identity,p['chunk_size'],p['index']))
+                    if not part:raise ValueError('Unknown dataset chunk')
+                    return part.artifact
                 return bound.table_ref
             return sources[source]
         return {'attempt':a.id,'owner_id':flow.owner_id,'handler':t.spec['handler'],'parameters':t.spec['parameters'],'inputs':{name:resolve(source) for name,source in t.spec['inputs'].items()}}

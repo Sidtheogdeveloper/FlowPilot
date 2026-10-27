@@ -15,7 +15,7 @@ class Task(BaseModel):
     resources:Resources=Field(default_factory=Resources)
 class Plan(BaseModel):
     model_config=ConfigDict(extra='forbid')
-    tasks:list[Task]=Field(min_length=1,max_length=30)
+    tasks:list[Task]=Field(min_length=1,max_length=256)
 class PlanRequest(BaseModel):
     dataset_id:str|None=None
     dataset_ids:list[str]|None=Field(default=None,min_length=1,max_length=8)

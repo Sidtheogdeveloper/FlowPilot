@@ -113,3 +113,43 @@ All tools use the existing authenticated API. Team sharing does not widen the
 global owner filter. No third-party model or mail service is required for
 document extraction, exports, charts or in-app notifications. PDF exports use an
 embedded font with limited character coverage; Excel/CSV retain Unicode text.
+
+## Partitioned execution and planning controls
+
+Large-table aggregations (50,000 or more source rows) can expand into independent
+immutable chunk loads, row-local transformations and partial aggregations, followed
+by a reducer. Sum, non-null count, row count, min, max and weighted mean are
+supported. Mean combines partial sums/counts; it never averages chunk averages.
+Filters, conversions, arithmetic measures, time buckets and explicit missing-value
+fills can execute before each partial aggregation.
+
+Joins, exact distinct counts, median, IQR and other global operations retain their
+original execution path. Expansion is bounded to 96 chunks per aggregation and
+256 total DAG nodes; fallback reasons appear in estimate details. Chunk files are
+read independently by workers. The reducer still needs sufficient memory for its
+partial states and output groups. Existing upload/table/intermediate row limits
+remain unchanged. Reassociation can change the last floating-point digits.
+
+Every unstarted preview shows an advisory execution-time estimate, declared
+largest-task memory and compatible live-worker capacity. Details identify blocked
+tasks and explain the estimator. Historical accepted durations or cold-start
+per-row priors feed a dependency/resource-aware list simulation. Accepted/reused
+outputs are skipped. This is not a calibrated timing guarantee or a measured peak
+memory figure; planning, chunk preparation, competing queues and variable storage
+overhead are excluded.
+
+**Edit plan (optional)** opens form controls for filters, grouping, metrics and
+composite equality-join keys/semantics. Users can add a source filter or disable
+partitioning. Edited joins require explicit confirmation; many-to-many joins
+require an additional opt-in and still obey row limits. Validation and join
+preflight must succeed before a new preview version is saved. The earlier
+unstarted preview is marked superseded/cancelled; running/completed workflows
+cannot be edited. The normal Run button does not require opening the editor.
+
+Dataset tools include **Drift**. Version uploads immediately compare the new
+version with the selected baseline: added/removed columns, changed inferred types,
+missing-rate changes of at least 10 percentage points and numeric empirical CDF
+(KS) distances of at least 0.20. Distribution comparison needs at least 20
+nonmissing numeric observations in each version. These are review heuristics, not
+significance tests or claims that a changed dataset is wrong. Original files,
+profiles and previous results stay immutable.

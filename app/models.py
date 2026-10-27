@@ -54,6 +54,13 @@ class Dataset(Base):
     table_ref:Mapped[str|None]=mapped_column(String,nullable=True)
     sheet:Mapped[str|None]=mapped_column(String,nullable=True)
     kind:Mapped[str]=mapped_column(String,default='tabular',server_default='tabular')
+class DatasetPartition(Base):
+    __tablename__='dataset_partitions'
+    dataset_id:Mapped[str]=mapped_column(ForeignKey('datasets.id',ondelete='CASCADE'),primary_key=True)
+    chunk_size:Mapped[int]=mapped_column(Integer,primary_key=True)
+    index:Mapped[int]=mapped_column(Integer,primary_key=True)
+    artifact:Mapped[str]=mapped_column(String)
+    rows:Mapped[int]=mapped_column(Integer)
 class DatasetRevision(Base):
     __tablename__='dataset_revisions'
     dataset_id:Mapped[str]=mapped_column(ForeignKey('datasets.id',ondelete='CASCADE'),primary_key=True)

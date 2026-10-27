@@ -136,7 +136,8 @@ async def upload_version(key:str,file:UploadFile=File(...)):
         number=max(s.scalars(select(db.DatasetRevision.revision).where(db.DatasetRevision.family_id==base.family_id)),default=1)+1
         new=db.Dataset(id=str(uuid.uuid4()),filename=file.filename or d.filename,rows=len(frame),artifact=artifact,table_ref=table_ref,profile_ref=profile_ref,sheet=d.sheet)
         s.add(new);s.flush();s.add(db.DatasetRevision(dataset_id=new.id,family_id=base.family_id,revision=number))
-        return dict(dataset_info(new),revision=number)
+        from .planning_tools import drift_between
+        return dict(dataset_info(new),revision=number,drift=drift_between(d,new))
 
 @router.get('/workflows/{key}/compare')
 def compare(key:str,other:str|None=None):
@@ -154,7 +155,7 @@ def accepted_tables(s,flow):
     tasks=list(s.scalars(select(db.TaskRow).where(db.TaskRow.workflow_id==flow.id,db.TaskRow.status=='completed')))
     # Prefer analytical outputs rather than loading the entire source table for chart menus.
     for t in tasks:
-        if not t.artifact or t.artifact.endswith('.html') or t.spec['handler'] in ('table_load','validate_dataset','clean_transactions','document_load','document_search','document_summarize'):continue
+        if not t.artifact or t.artifact.endswith('.html') or t.spec['handler'] in ('table_load','table_load_chunk','table_partial','validate_dataset','clean_transactions','document_load','document_search','document_summarize'):continue
         content=artifacts.read_json(t.artifact)
         if isinstance(content,dict) and isinstance(content.get('rows'),list):yield t,content
 

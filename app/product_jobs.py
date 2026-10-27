@@ -29,6 +29,9 @@ def replay(s,base,use_latest=True,scheduled=False,reuse=True):
     else:
         plan,profiles=compile_table_intent(record['intent'],datasets,record.get('confirmations',[]))
         plan['tasks'][-1]['parameters']['question']=question;validate_plan(plan);preflight(plan,datasets);record['profiles']=profiles
+    if record['kind']=='tabular':
+        from .partitioning import prepare_execution
+        plan,record['execution']=prepare_execution(s,plan,datasets,record.get('execution',{}).get('enabled',True))
     key=str(uuid.uuid4());flow=db.Workflow(id=key,dataset_id=datasets[0].id,plan=plan,planner=record,policy=base.policy,status='running',started=db.now());s.add(flow);s.flush()
     for task in plan['tasks']:s.add(db.TaskRow(id=key+':'+task['id'],workflow_id=key,task_id=task['id'],spec=task))
     s.flush()
