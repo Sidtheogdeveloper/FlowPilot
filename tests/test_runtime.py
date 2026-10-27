@@ -16,8 +16,11 @@ def client(tmp_path,monkeypatch):
         pytest.fail('Integration tests require the dedicated workflow_test database; refusing to reset application data')
     monkeypatch.setattr(artifacts,'ROOT',tmp_path)
     db.init_db()
-    with db.Session.begin() as s:s.execute(text('TRUNCATE pending_plans,events,attempts,tasks,workflows,datasets,workers RESTART IDENTITY CASCADE'))
+    with db.Session.begin() as s:s.execute(text('TRUNCATE pending_plans,events,attempts,tasks,workflows,datasets,workers,artifact_grants,user_sessions,account_tokens,auth_throttles,users RESTART IDENTITY CASCADE'))
     with TestClient(app) as c:
+        account=c.post('/auth/register',json={'email':'test@example.org','name':'Test Analyst','password':'A synthetic testing passphrase 123!'})
+        assert account.status_code==201,account.text
+        c.headers['X-FlowPilot-CSRF']=account.json()['csrf_token']
         yield c
 
 def take(worker,generation):

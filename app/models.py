@@ -1,13 +1,52 @@
 import os
 from datetime import datetime,timezone
-from sqlalchemy import create_engine,String,JSON,DateTime,Integer,Float,ForeignKey
+from sqlalchemy import create_engine,String,JSON,DateTime,Integer,Float,ForeignKey,Boolean
 from sqlalchemy.orm import DeclarativeBase,Mapped,mapped_column,sessionmaker
 
 def now():return datetime.now(timezone.utc)
 class Base(DeclarativeBase):pass
+class User(Base):
+    __tablename__='users'
+    id:Mapped[str]=mapped_column(String,primary_key=True)
+    email:Mapped[str]=mapped_column(String(254),unique=True,index=True)
+    name:Mapped[str]=mapped_column(String(80))
+    password_hash:Mapped[str]=mapped_column(String)
+    active:Mapped[bool]=mapped_column(Boolean,default=True)
+    email_verified:Mapped[bool]=mapped_column(Boolean,default=False)
+    created:Mapped[datetime]=mapped_column(DateTime(timezone=True),default=now)
+class UserSession(Base):
+    __tablename__='user_sessions'
+    id:Mapped[str]=mapped_column(String,primary_key=True)
+    user_id:Mapped[str]=mapped_column(ForeignKey('users.id'),index=True)
+    token_hash:Mapped[str]=mapped_column(String,unique=True,index=True)
+    created:Mapped[datetime]=mapped_column(DateTime(timezone=True),default=now)
+    last_seen:Mapped[datetime]=mapped_column(DateTime(timezone=True),default=now)
+    expires:Mapped[datetime]=mapped_column(DateTime(timezone=True))
+    revoked:Mapped[bool]=mapped_column(Boolean,default=False)
+    agent:Mapped[str]=mapped_column(String(180),default='')
+class AuthThrottle(Base):
+    __tablename__='auth_throttles'
+    id:Mapped[str]=mapped_column(String,primary_key=True)
+    count:Mapped[int]=mapped_column(Integer,default=0)
+    window:Mapped[datetime]=mapped_column(DateTime(timezone=True),default=now)
+class AccountToken(Base):
+    __tablename__='account_tokens'
+    id:Mapped[str]=mapped_column(String,primary_key=True)
+    user_id:Mapped[str]=mapped_column(ForeignKey('users.id'),index=True)
+    purpose:Mapped[str]=mapped_column(String)
+    token_hash:Mapped[str]=mapped_column(String,unique=True,index=True)
+    expires:Mapped[datetime]=mapped_column(DateTime(timezone=True))
+    consumed:Mapped[bool]=mapped_column(Boolean,default=False)
+class ArtifactGrant(Base):
+    __tablename__='artifact_grants'
+    owner_id:Mapped[str]=mapped_column(ForeignKey('users.id'),primary_key=True)
+    artifact:Mapped[str]=mapped_column(String,primary_key=True)
+    size:Mapped[int]=mapped_column(Integer,default=0)
+    created:Mapped[datetime]=mapped_column(DateTime(timezone=True),default=now)
 class Dataset(Base):
     __tablename__='datasets'
     id:Mapped[str]=mapped_column(String,primary_key=True)
+    owner_id:Mapped[str|None]=mapped_column(ForeignKey('users.id'),nullable=True,index=True)
     filename:Mapped[str]=mapped_column(String)
     artifact:Mapped[str]=mapped_column(String)
     rows:Mapped[int]=mapped_column(Integer)
@@ -17,12 +56,14 @@ class Dataset(Base):
 class PendingPlan(Base):
     __tablename__='pending_plans'
     id:Mapped[str]=mapped_column(String,primary_key=True)
+    owner_id:Mapped[str|None]=mapped_column(ForeignKey('users.id'),nullable=True,index=True)
     payload:Mapped[dict]=mapped_column(JSON)
     created:Mapped[datetime]=mapped_column(DateTime(timezone=True),default=now)
 
 class Workflow(Base):
     __tablename__='workflows'
     id:Mapped[str]=mapped_column(String,primary_key=True)
+    owner_id:Mapped[str|None]=mapped_column(ForeignKey('users.id'),nullable=True,index=True)
     dataset_id:Mapped[str]=mapped_column(ForeignKey('datasets.id'))
     status:Mapped[str]=mapped_column(String,default='planned')
     plan:Mapped[dict]=mapped_column(JSON)
@@ -79,3 +120,8 @@ def init_db(url=None):
     with ENGINE.begin() as connection:
         for name in ('profile_ref','table_ref','sheet'):
             connection.execute(text('ALTER TABLE datasets ADD COLUMN IF NOT EXISTS '+name+' VARCHAR'))
+        for table in ('datasets','workflows','pending_plans'):
+            connection.execute(text('ALTER TABLE '+table+' ADD COLUMN IF NOT EXISTS owner_id VARCHAR REFERENCES users(id)'))
+            connection.execute(text('CREATE INDEX IF NOT EXISTS ix_'+table+'_owner_id ON '+table+' (owner_id)'))
+    from .tenancy import install
+    install()

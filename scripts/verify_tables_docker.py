@@ -1,4 +1,4 @@
-"""Real local API + two Docker workers: overview, process failure and restart."""
+"""Real local API + three Docker workers: overview, process failure and restart."""
 import json
 import subprocess
 import time
@@ -22,7 +22,7 @@ def main():
         raw=b'device,reading,site\n'+b''.join(f'd{i%30},{i%100},s{i%4}\n'.encode() for i in range(60000))
         upload=c.post('/datasets',files={'file':('sensor_unseen.csv',raw)});upload.raise_for_status();dataset=upload.json()
         preview=c.post('/plans',json={'dataset_id':dataset['id'],'generic':True,'request':'overview'});preview.raise_for_status();identity=preview.json()['id']
-        compose('stop','worker_b')
+        compose('stop','worker_b','worker_c')
         try:
             c.post('/workflows/'+identity+'/start').raise_for_status();victim=None;deadline=time.monotonic()+20
             while time.monotonic()<deadline:
@@ -36,10 +36,10 @@ def main():
             assert detail['status']=='completed',detail
             assert any(e['kind']=='attempt_expired' and e['data']['attempt']==victim for e in detail['events'])
             evidence['worker_failure']={'workflow_id':identity,'expired_attempt':victim,'status':detail['status'],'tasks':detail['tasks']}
-        finally:compose('start','worker_a','worker_b')
+        finally:compose('start','worker_a','worker_b','worker_c')
         references=[t['artifact'] for t in detail['tasks']]
         for reference in references:c.get('/artifacts/'+reference).raise_for_status()
-        compose('restart','database','api','worker_a','worker_b')
+        compose('restart','database','api','worker_a','worker_b','worker_c')
         deadline=time.monotonic()+60
         while time.monotonic()<deadline:
             try:

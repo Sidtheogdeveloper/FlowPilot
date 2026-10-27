@@ -20,8 +20,11 @@ def run(stop=None,id=None,cpu=None,memory_mb=None,speed=None):
         except DBAPIError:
             logging.warning('Worker temporarily cannot claim database work; will retry');stop.wait(.5);continue
         if job:
+            from .tenancy import owner
+            owner_token=owner.set(job.get('owner_id'))
             try:output=execute(job['handler'],job['inputs'],job['parameters']);result={'artifact':output['id']}
             except Exception as exc:result={'error':str(exc)}
+            finally:owner.reset(owner_token)
             for attempt in range(6):
                 try:finish(job['attempt'],generation,**result);break
                 except DBAPIError:

@@ -7,6 +7,8 @@ def put(data:bytes,suffix='.json'):
     digest=hashlib.sha256(data).hexdigest();path=ROOT/(digest+suffix)
     if not path.exists():
         temp=ROOT/(str(uuid.uuid4())+'.tmp');temp.write_bytes(data);os.replace(temp,path)
+    from .tenancy import grant
+    grant(digest+suffix,len(data))
     return {'id':digest+suffix,'sha256':digest,'size':len(data),'path':str(path)}
 def read(id):
     path=(ROOT/id).resolve()

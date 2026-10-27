@@ -1,3 +1,7 @@
+# Phase 3: accounts and private workspaces
+
+Public registration and email/password sign-in now protect datasets, workflows and downloads. See [SECURITY.md](SECURITY.md). The account suite adds 10 PostgreSQL-backed security tests; all 160 existing backend tests and 20 frontend tests passed on 27 October 2026.
+
 # FlowPilot
 
 FlowPilot is a local conversational workspace for CSV and Excel analysis. It profiles selected tables, turns supported questions into typed analytical intent, compiles and validates a DAG, and runs approved operations on independent worker processes. Follow-ups create separate workflow versions and preserve previous results.

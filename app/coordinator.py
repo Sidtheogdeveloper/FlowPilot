@@ -94,7 +94,7 @@ def claim(worker_id,generation):
                 if not bound or not bound.table_ref:raise ValueError('Missing profiled table')
                 return bound.table_ref
             return sources[source]
-        return {'attempt':a.id,'handler':t.spec['handler'],'parameters':t.spec['parameters'],'inputs':{name:resolve(source) for name,source in t.spec['inputs'].items()}}
+        return {'attempt':a.id,'owner_id':flow.owner_id,'handler':t.spec['handler'],'parameters':t.spec['parameters'],'inputs':{name:resolve(source) for name,source in t.spec['inputs'].items()}}
 
 def finish(attempt_id,worker_generation,artifact=None,error=None):
     if artifact is not None:artifacts.read(artifact) # checksum and path validation before DB acceptance
@@ -121,6 +121,9 @@ def finish(attempt_id,worker_generation,artifact=None,error=None):
                     from .contracts import Plan
                     expected=validate_generic_plan(Plan.model_validate(flow.plan))[t.task_id]
                     if output['schema']!=expected:raise ValueError('Result schema differs from validated task output')
+            if flow.owner_id:
+                from sqlalchemy.dialects.postgresql import insert
+                s.execute(insert(db.ArtifactGrant).values(owner_id=flow.owner_id,artifact=artifact,size=len(artifacts.read(artifact))).on_conflict_do_nothing())
             a.status='completed';t.status='completed';t.artifact=artifact;event(s,flow.id,'accepted',{'task':t.task_id,'artifact':artifact})
         return True
 
@@ -150,7 +153,3 @@ def loop(stop):
         except Exception:
             import logging;logging.exception('Coordinator tick failed')
         stop.wait(.1)
-
-
-
-

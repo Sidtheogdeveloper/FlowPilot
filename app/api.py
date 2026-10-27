@@ -16,8 +16,11 @@ async def lifespan(app):
     db.init_db();stop=threading.Event();thread=threading.Thread(target=loop,args=(stop,),daemon=True);thread.start()
     yield
     stop.set();thread.join(5)
-app=FastAPI(title='Retail Workflow Portal',lifespan=lifespan)
-app.add_middleware(CORSMiddleware,allow_origins=['http://localhost:5173','http://localhost:4173'],allow_methods=['*'],allow_headers=['*'])
+app=FastAPI(title='FlowPilot',lifespan=lifespan)
+app.add_middleware(CORSMiddleware,allow_origins=['http://localhost:5173','http://localhost:4173'],allow_credentials=True,allow_methods=['*'],allow_headers=['*'])
+from .auth import AuthenticationMiddleware,router as account_router
+app.add_middleware(AuthenticationMiddleware)
+app.include_router(account_router)
 @app.get('/health')
 def health():return {'status':'ok'}
 @app.get('/catalogue')
@@ -70,6 +73,8 @@ def save_table(data,name,sheet=None):
 
 @app.post('/workbooks/{identity}/sheets')
 def select_sheet(identity:str,payload:dict):
+    from .tenancy import owns_artifact
+    if not owns_artifact(identity):raise HTTPException(404,'Workbook not found')
     try:
         if not re.fullmatch(r'[a-f0-9]{64}\.xlsx',identity):raise ValueError('Invalid workbook ID')
         name=payload.get('filename','workbook.xlsx')
@@ -246,6 +251,8 @@ def workers():
     with db.Session() as s:return [{'id':w.id,'cpu':w.cpu,'memory_mb':w.memory_mb,'heartbeat':w.heartbeat.isoformat(),'generation':w.generation,'handlers':w.handlers,'speed':w.speed} for w in s.scalars(select(db.Worker))]
 @app.get('/artifacts/{id}')
 def download(id):
+    from .tenancy import owns_artifact
+    if not owns_artifact(id):raise HTTPException(404,'Artifact not found')
     try:data=artifacts.read(id)
     except (ValueError,FileNotFoundError):raise HTTPException(404,'Artifact not found')
     return Response(data,media_type='text/html' if id.endswith('.html') else 'application/json' if id.endswith('.json') else 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' if id.endswith('.xlsx') else 'text/csv',headers={'Content-Disposition':'attachment; filename="'+id+'"'})

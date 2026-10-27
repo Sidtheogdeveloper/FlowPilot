@@ -14,7 +14,7 @@ services:
       OLLAMA_KEEP_ALIVE: 30m
     ports: ["127.0.0.1:8003:11434"]
     volumes:
-      - ./.models:/models:ro
+      - ../.local_services/gguf:/models:ro
       - table_ollama_models:/root/.ollama
 volumes:
   table_ollama_models:

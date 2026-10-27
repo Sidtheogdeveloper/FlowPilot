@@ -65,7 +65,7 @@ try{
         Start-Sleep -Milliseconds 500
     }
     if(-not $ready){throw 'API did not start; inspect .runtime/api.err.log (no database credentials are printed by this launcher).'}
-    foreach($worker in @(@{id='local-worker-a';cpu='2';memory='512'},@{id='local-worker-b';cpu='1';memory='256'})){
+    foreach($worker in @(@{id='local-worker-a';cpu='2';memory='512'},@{id='local-worker-b';cpu='1';memory='256'},@{id='local-worker-c';cpu='1';memory='512'})){
         $env:WORKER_ID=$worker.id;$env:WORKER_CPU=$worker.cpu;$env:WORKER_MEMORY_MB=$worker.memory
         $launched+=Start-ApplicationProcess $worker.id $PythonPath @('-m','app.worker') $applicationRoot
     }
@@ -92,4 +92,3 @@ try{
 }finally{
     foreach($name in $variableNames){[Environment]::SetEnvironmentVariable($name,$oldEnvironment[$name],'Process')}
 }
-

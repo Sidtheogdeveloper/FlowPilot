@@ -93,7 +93,7 @@ assert outputs(flow)==baseline
 evidence['runs'].append({'id':wid,'policy':'bounded','planner':flow['planner'],'metrics':flow['metrics'],'output_hashes':baseline})
 print('PASS: container-hosted model planning, requested parameter2, and complete report',flush=True)
 
-compose('restart','database','api','worker_a','worker_b')
+compose('restart','database','api','worker_a','worker_b','worker_c')
 deadline=time.monotonic()+60
 while time.monotonic()<deadline:
     try:
@@ -103,7 +103,7 @@ while time.monotonic()<deadline:
 else: raise AssertionError('API did not recover after restart')
 retained=get_flow(wid)
 assert retained['status']=='completed' and outputs(retained)==baseline
-evidence['restart_persistence']={'workflow':wid,'status':'completed','verified_artifacts':6,'restarted_services':['database','api','worker_a','worker_b']}
+evidence['restart_persistence']={'workflow':wid,'status':'completed','verified_artifacts':6,'restarted_services':['database','api','worker_a','worker_b','worker_c']}
 print('PASS: container restart preserved workflow and six downloadable artifacts',flush=True)
 
 # Kill an actual worker with an in-flight large-data attempt, then let the other worker recover it.

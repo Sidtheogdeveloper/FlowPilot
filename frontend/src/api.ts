@@ -1,4 +1,6 @@
 export const API_BASE = '/api';
+let csrfToken = '';
+export function setCsrfToken(value: string) {csrfToken = value;}
 export function errorMessage(value: unknown): string {
   if (typeof value === 'string') return value;
   if (Array.isArray(value)) return value.map(x => errorMessage(x)).join('; ');
@@ -13,10 +15,14 @@ export function errorMessage(value: unknown): string {
 }
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers);
+  if (csrfToken && !['GET','HEAD','OPTIONS'].includes((options.method || 'GET').toUpperCase())) headers.set('X-FlowPilot-CSRF',csrfToken);
   if (options.body && !(options.body instanceof FormData)) headers.set('Content-Type', 'application/json');
-  const response = await fetch(`${API_BASE}${path}`, {...options, headers});
+  const response = await fetch(`${API_BASE}${path}`, {...options, credentials:'same-origin', headers});
   const data: unknown = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(errorMessage(data) + ` (HTTP ${response.status})`);
+  if (!response.ok) {
+    if(response.status===401 && !path.startsWith('/auth/') && typeof window!=='undefined') window.dispatchEvent(new Event('flowpilot-session-expired'));
+    throw new Error(errorMessage(data) + ` (HTTP ${response.status})`);
+  }
   return data as T;
 }
 export const post = <T>(path: string, value?: unknown) => api<T>(path, {method: 'POST', ...(value !== undefined ? {body:JSON.stringify(value)} : {})});

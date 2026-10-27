@@ -64,6 +64,19 @@ services:
     volumes: ["artifacts:/artifacts"]
     depends_on:
       api: {condition: service_healthy}
+  worker_c:
+    build: .
+    command: python -m app.worker
+    environment:
+      <<: *env
+      WORKER_ID: worker-c
+      WORKER_CPU: 1
+      WORKER_MEMORY_MB: 512
+    cpus: 1
+    mem_limit: 768m
+    volumes: ["artifacts:/artifacts"]
+    depends_on:
+      api: {condition: service_healthy}
   llm:
     profiles: ["llm"]
     build:
@@ -90,4 +103,3 @@ volumes:
   model_cache:
   postgres_data:
   artifacts:
-
